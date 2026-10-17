@@ -214,10 +214,13 @@ function main(PH) {
     t.play.setAttribute('aria-pressed', String(!t.playing));
   }
 
+  // phones: long side capped at 480 in a tile, 720 full screen
+  const small = () => Math.min(innerWidth, innerHeight) <= 600;
   function sizeOf(t) {
     const r = t.canvas.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    return [Math.max(2, Math.round(r.width * dpr)), Math.max(2, Math.round(r.height * dpr))];
+    let s = Math.min(window.devicePixelRatio || 1, 1.5);
+    if (small()) s = Math.min(s, (t.full ? 720 : 480) / Math.max(r.width, r.height, 1));
+    return [Math.max(2, Math.round(r.width * s)), Math.max(2, Math.round(r.height * s))];
   }
 
   function startHydra(t) {

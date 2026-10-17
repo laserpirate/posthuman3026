@@ -32,7 +32,8 @@ node build.mjs scenes --lib ../../All_Kodamas   # extract cards, inline the mani
 node capture.mjs                            # still plate per scene -> .cache/stills/
 PH_PASSWORD=... node build.mjs pack --lib ../../All_Kodamas   # encrypt -> ../docs/
 PH_PASSWORD=... node leakcheck.mjs          # no kodama text, Hydra code or password in plaintext in docs/
-PH_PASSWORD=... node e2e.mjs                # headless end to end
+PH_PASSWORD=... node e2e.mjs                # headless end to end (--base URL to test live)
+PH_PASSWORD=... node phone.mjs              # phone widths 360/390/430 + 390 landscape (--base URL)
 ```
 
 `--lib` defaults to `../../All_Kodamas` relative to `build/`.

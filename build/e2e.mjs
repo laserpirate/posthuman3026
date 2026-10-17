@@ -84,6 +84,11 @@ const n = await page.locator('.card').count();
 const groupIds = await page.$$eval('.group', els => els.map(e => e.id));
 check('12 cards in 2 groups', n === 12 && groupIds.join() === 'g-delta,g-spec', `${n} ${groupIds}`);
 check('series filter dropped', !(await page.$('#f-series')));
+const rows = await page.evaluate(() => ['delta', 'spec'].map(g => {
+  const tops = [...document.querySelectorAll('#g-' + g + ' .card')].map(c => Math.round(c.getBoundingClientRect().top));
+  return [...new Set(tops)].map(t => tops.filter(x => x === t).length).join('+');
+}));
+check('desktop: 3 cards per row', rows.every(r => r === '3+3'), rows.join(' '));
 await page.waitForTimeout(1500);
 await shot(page, '2-top');
 
