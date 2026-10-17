@@ -1,0 +1,31 @@
+{
+ "source": "https://github.com/hydra-synth/hydra/blob/1fab4f65d5797d3f9cf2c83286cbad1d51cdd47a/src/stores/examples.json",
+ "license": "CC BY-NC-SA 4.0 https://creativecommons.org/licenses/by-nc-sa/4.0/",
+ "note": "code decoded verbatim (base64 then URI); each sketch is by the artist named in its header",
+ "sketches": [
+  {
+   "id": "celeste_1",
+   "code": "// Puertas III\n// por Celeste Betancur\n// https://github.com/essteban\n \nosc(40,0.2,1)\n  .modulateScale(osc(40,0,1).kaleid(8))\n  .repeat(2,4)\n  .modulate(o0,0.05)\n  .modulateKaleid(shape(4,0.1,1))\n  .out(o0)"
+  },
+  {
+   "id": "ritchse_1",
+   "code": "//corrupted screensaver\n//by Ritchse\n//instagram.com/ritchse\n \nvoronoi(350,0.15)\n  \t.modulateScale(osc(8).rotate(Math.sin(time)),.5)\n  \t.thresh(.8)\n\t.modulateRotate(osc(7),.4)\n\t.thresh(.7)\n  \t.diff(src(o0).scale(1.8))\n\t.modulateScale(osc(2).modulateRotate(o0,.74))\n\t.diff(src(o0).rotate([-.012,.01,-.002,0]).scrollY(0,[-1/199800,0].fast(0.7)))\n\t.brightness([-.02,-.17].smooth().fast(.5))\n\t.out()"
+  },
+  {
+   "id": "nesso_0",
+   "code": "\n//clouds of passage\n//by Nesso\n//www.nesso.xyz\n\nshape([4,5,6].fast(0.1).smooth(1),0.000001,[0.2,0.7].smooth(1))\n.color(0.2,0.4,0.3)\n.scrollX(()=>Math.sin(time*0.27))\n.add(\n  shape([4,5,6].fast(0.1).smooth(1),0.000001,[0.2,0.7,0.5,0.3].smooth(1))\n  .color(0.6,0.2,0.5)\n  .scrollY(0.35)\n  .scrollX(()=>Math.sin(time*0.33)))\n.add(\n  shape([4,5,6].fast(0.1).smooth(1),0.000001,[0.2,0.7,0.3].smooth(1))\n  .color(0.2,0.4,0.6)\n  .scrollY(-0.35)\n  .scrollX(()=>Math.sin(time*0.41)*-1))\n.add(\n      src(o0).shift(0.001,0.01,0.001)\n      .scrollX([0.05,-0.05].fast(0.1).smooth(1))\n      .scale([1.05,0.9].fast(0.3).smooth(1),[1.05,0.9,1].fast(0.29).smooth(1))\n      ,0.85)\n.modulate(voronoi(10,2,2))\n.out()"
+  },
+  {
+   "id": "marianne_0",
+   "code": "//port\n//by Marianne Teixido\n//https://marianneteixido.github.io/\n\nosc(5, 0.9, 0.001)\n    .kaleid([3,4,5,7,8,9,10].fast(0.1))\n    .color(0.5, 0.3)\n    .colorama(0.4)\n    .rotate(0.009,()=>Math.sin(time)* -0.001 )\n    .modulateRotate(o0,()=>Math.sin(time) * 0.003)\n    .modulate(o0, 0.9)\n    .scale(0.9)\n    .out(o0)\n\n"
+  },
+  {
+   "id": "andromeda_1",
+   "code": "// 3.3\n// by ΔNDR0M3DΔ\n// https://www.instagram.com/androm3_da/\n\nosc().modulateRotate(o0,0.3).out()\nosc(33,0.3,0.3).diff(o3,3).out(o1)\nosc(3,0.3,33).modulateKaleid(o3,3).diff(o0).out(o2)\nsrc(o0,3).mult(o1,3).kaleid(3).out(o3)\nrender(o2)"
+  },
+  {
+   "id": "ritchse_4",
+   "code": "// disintegration\n// by Ritchse\n// instagram.com/ritchse\n \nosc(5,.1).modulate(noise(6),.22).diff(o0)\n  \t.modulateScrollY(osc(2).modulate(osc().rotate(),.11))\n\t.scale(.72).color(0.99,1.014,1)\n  \t.out()"
+  }
+ ]
+}

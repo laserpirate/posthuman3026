@@ -1,0 +1,56 @@
+<header class="top" id="top">
+  <div class="wrap top-in">
+    <a class="brand" href="#top">POST HUMAN</a>
+    <nav class="sections" aria-label="Sections">
+      <a href="#kodamas"><span>01</span> Phylla Kodamas</a>
+      <a href="#hydras"><span>02</span> Hydras</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="kodamas" class="sec">
+    <h2 class="sec-h"><span class="num">01</span>Phylla Kodamas</h2>
+    <div class="notice notice-acc">
+      <p><strong>All Phylla Kodamas are original works by Marko Manriquez.</strong> &copy; 2026. All rights reserved.</p>
+      <p>No reproduction, redistribution, screenshots for publication, or use for AI or machine-learning training without written permission.</p>
+    </div>
+    <div class="filters">
+      <label class="fld">Series
+        <select id="f-series"><option value="">All series</option></select>
+      </label>
+      <label class="fld fld-q">Search
+        <input id="f-q" type="search" placeholder="kID or word" autocomplete="off" spellcheck="false">
+      </label>
+      <span class="shown" id="f-n" aria-live="polite"></span>
+    </div>
+    <nav class="chips" id="chips" aria-label="Groups"></nav>
+    <div id="groups"></div>
+    <p class="empty" id="f-empty" hidden>No matches</p>
+  </section>
+
+  <section id="hydras" class="sec">
+    <h2 class="sec-h"><span class="num">02</span>Hydras</h2>
+    <div class="notice">
+      <p><strong>Not Marko Manriquez's work.</strong> These six sketches are by the artists credited on each tile, from the Hydra gallery, and are licensed <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-NC-SA 4.0</a>. Code shown verbatim.</p>
+      <p>Running live in <a href="https://github.com/hydra-synth/hydra-synth" target="_blank" rel="noopener noreferrer">hydra-synth</a> by Olivia Jack (AGPL-3.0).</p>
+    </div>
+    <div class="tiles" id="tiles"></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <p>&copy; 2026 Marko Manriquez. All rights reserved.</p>
+    <p>No reproduction, redistribution or use for AI or machine-learning training without written permission.</p>
+    <p class="dim">Hydra sketches: their artists, CC BY-NC-SA 4.0. hydra-synth: Olivia Jack, AGPL-3.0. three.js: MIT. Fonts: SIL OFL 1.1.</p>
+  </div>
+</footer>
+
+<div class="fs" id="fs" hidden role="dialog" aria-modal="true" aria-label="Full screen scene">
+  <div class="fs-bar">
+    <span class="fs-title" id="fs-title"></span>
+    <button type="button" class="btn btn-sig" id="fs-close">Close <kbd>Esc</kbd></button>
+  </div>
+  <div class="fs-body" id="fs-body"></div>
+</div>

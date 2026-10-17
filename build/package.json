@@ -1,0 +1,16 @@
+{
+  "name": "posthuman-build",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "stills": "node capture.mjs",
+    "e2e": "node e2e.mjs"
+  },
+  "devDependencies": {
+    "@fontsource/chakra-petch": "^5.3.0",
+    "@fontsource/martian-mono": "^5.3.0",
+    "@fontsource/schibsted-grotesk": "^5.3.0",
+    "hydra-synth": "^1.4.0",
+    "playwright": "^1.48.2"
+  }
+}

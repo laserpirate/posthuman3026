@@ -1,0 +1,29 @@
+Copyright (c) 2026 Marko Manriquez. All rights reserved.
+
+All Phylla Kodamas are original works by Marko Manriquez. No reproduction.
+
+Except as listed below, all content in this repository and on the site built from it (including the kodama
+scenes, still images, text, design and code) is the property of Marko Manriquez. No part of it may be
+reproduced, redistributed, modified, published, or used to train, fine-tune or evaluate any artificial
+intelligence or machine-learning system, or included in any dataset, without prior written permission.
+
+Viewing the site at the invitation of the author is permitted. No other license is granted.
+
+EXCEPTIONS (each under its own terms, not covered by the reservation above)
+
+1. Hydra sketches (build/data/hydra-sketches.json and their display on the site)
+   celeste_1 "Puertas III" by Celeste Betancur; ritchse_1 "corrupted screensaver" and ritchse_4
+   "disintegration" by Ritchse; nesso_0 "clouds of passage" by Nesso; marianne_0 "port" by Marianne Teixido;
+   andromeda_1 "3.3" by ΔNDR0M3DΔ. From the Hydra gallery (https://hydra.ojack.xyz).
+   License: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+   https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+2. hydra-synth (docs/vendor/hydra-synth/) by Olivia Jack and contributors.
+   License: GNU Affero General Public License v3.0. Full text in docs/vendor/hydra-synth/LICENSE.
+   Source: https://github.com/hydra-synth/hydra-synth
+
+3. three.js r128 (loaded from cdnjs by the kodama scenes) by the three.js authors.
+   License: MIT. https://github.com/mrdoob/three.js/blob/r128/LICENSE
+
+4. Fonts in docs/fonts/ (Chakra Petch, Schibsted Grotesk, Martian Mono).
+   License: SIL Open Font License 1.1. Full text in docs/fonts/OFL.txt.

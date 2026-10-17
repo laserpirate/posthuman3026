@@ -1,0 +1,7 @@
+# ai.txt
+# (c) 2026 Marko Manriquez. All rights reserved.
+# No use of any content on this site for AI or machine-learning training,
+# fine-tuning, embedding, dataset building or generation.
+User-Agent: *
+Disallow: /
+Disallow: *
