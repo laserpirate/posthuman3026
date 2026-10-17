@@ -115,3 +115,18 @@ body.fs-open{overflow:hidden}
   .shown{margin-left:0;padding-bottom:0}
   .sec-h{gap:10px}
 }
+
+/* floating close in viewers on phones and touch: replaces the header and tile close buttons */
+.fx{display:none}
+@media (max-width:600px),(pointer:coarse){
+  .fx{display:inline-flex;align-items:center;justify-content:center;gap:6px;position:fixed;z-index:130;
+    top:max(12px,env(safe-area-inset-top));left:max(12px,env(safe-area-inset-left));min-width:44px;height:44px;padding:0 14px;
+    background:rgba(10,11,11,.86);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:0;
+    color:var(--acc);font:500 13px/1 var(--f-head);letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+  .fx[hidden]{display:none}
+  .fx:focus-visible{outline:1px solid var(--acc);outline-offset:2px}
+  #fs-close,.stage.is-full .x{display:none}
+  /* the bar holds the button so it never sits on a scene's own controls */
+  .fs-bar{min-height:calc(max(12px,env(safe-area-inset-top)) + 56px);padding-top:max(12px,env(safe-area-inset-top));
+    padding-left:calc(max(12px,env(safe-area-inset-left)) + 56px)}
+}

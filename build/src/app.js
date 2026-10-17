@@ -72,7 +72,7 @@ function main(PH) {
           h('div', { class: 'acts' }, pv, fsb)));
       const rec = { c, el, plate, img, pv, group: g.id, hay: [c.kid, c.title, c.desc, c.sci, c.tide, c.series].join(' ').toLowerCase() };
       pv.addEventListener('click', () => (live === rec ? stopPreview() : startPreview(rec)));
-      fsb.addEventListener('click', () => openFull(rec.c));
+      fsb.addEventListener('click', () => openFull(rec.c, fsb));
       cardEls.push(rec);
       grid.append(el);
     }
@@ -150,20 +150,21 @@ function main(PH) {
 
   const fs = $('#fs'), fsBody = $('#fs-body'), fsTitle = $('#fs-title');
   let fsUrl = null, fsTok = 0;
-  function openFull(card) {
+  function openFull(card, opener) {
     stopPreview();
     const tok = ++fsTok;
     fsTitle.textContent = card.kid + '  ' + card.title;
     fs.hidden = false;
     document.body.classList.add('fs-open');
     $('#fs-close').focus();
+    enterViewer(fs, opener, closeFull);
     sceneUrl(card).then(url => {
       if (tok !== fsTok) { URL.revokeObjectURL(url); return; }
       fsUrl = url;
       const f = sceneFrame(url, card.kid);
       fsBody.append(f);
       f.addEventListener('load', () => f.focus());
-    }).catch(err => { console.error(err); closeFull(); });
+    }).catch(err => { console.error(err); leaveViewer(); });
   }
   function closeFull() {
     fsTok++;
@@ -173,13 +174,47 @@ function main(PH) {
     fs.hidden = true;
     document.body.classList.remove('fs-open');
   }
-  $('#fs-close').addEventListener('click', closeFull);
+  $('#fs-close').addEventListener('click', () => leaveViewer());
+
+  // ---- viewers: one open at a time, with a history entry so phone back closes it -------------
+
+  // floating close for phones and touch; it moves into the open viewer so it also shows in
+  // element full screen, where only the full screen element's subtree is drawn
+  const fx = $('#fx');
+  let viewer = null, popSkip = false;
+  function enterViewer(host, opener, close) {
+    viewer = { close, opener, y: window.scrollY };
+    host.append(fx);
+    fx.hidden = false;
+    try { history.pushState({ phViewer: true }, ''); viewer.pushed = true; } catch (e) { /* file:// may refuse */ }
+  }
+  // fromPop: the browser already left the viewer's history entry
+  function leaveViewer(fromPop) {
+    if (!viewer) return;
+    const v = viewer;
+    viewer = null;
+    fx.hidden = true;
+    const wasFull = !!document.fullscreenElement;
+    v.close();
+    const restore = () => {
+      window.scrollTo({ top: v.y, behavior: 'instant' });
+      if (v.opener) v.opener.focus({ preventScroll: true });
+    };
+    restore();
+    // leaving element full screen resets scroll and focus once it settles; restore again then
+    if (wasFull) document.addEventListener('fullscreenchange', () => requestAnimationFrame(restore), { once: true });
+    if (!fromPop && v.pushed && history.state && history.state.phViewer) { popSkip = true; history.back(); }
+  }
+  window.addEventListener('popstate', () => {
+    if (popSkip) { popSkip = false; return; }
+    leaveViewer(true);
+  });
+  fx.addEventListener('click', () => leaveViewer());
 
   function onKey(e) {
-    if (e.key !== 'Escape') return;
-    if (!fs.hidden) { e.preventDefault(); closeFull(); return; }
-    const full = tiles.find(t => t.full);
-    if (full) { e.preventDefault(); setFull(full, false); }
+    if (e.key !== 'Escape' || !viewer) return;
+    e.preventDefault();
+    leaveViewer();
   }
   document.addEventListener('keydown', onKey);
 
@@ -203,8 +238,8 @@ function main(PH) {
     const t = { s, el, stage, canvas, pre, play, hydra: null, visible: false, playing: !reduceMotion, full: false };
     play.addEventListener('click', () => { t.playing = !t.playing; syncPlay(t); });
     code.addEventListener('click', () => { pre.hidden = !pre.hidden; code.setAttribute('aria-pressed', String(!pre.hidden)); });
-    full.addEventListener('click', () => setFull(t, true));
-    x.addEventListener('click', () => setFull(t, false));
+    full.addEventListener('click', () => { setFull(t, true); enterViewer(stage, full, () => setFull(t, false)); });
+    x.addEventListener('click', () => leaveViewer());
     syncPlay(t);
     return t;
   });
@@ -253,7 +288,7 @@ function main(PH) {
     requestAnimationFrame(() => resizeHydra(t));
   }
   document.addEventListener('fullscreenchange', () => {
-    if (!document.fullscreenElement) for (const t of tiles) if (t.full) setFull(t, false);
+    if (!document.fullscreenElement && tiles.some(t => t.full)) leaveViewer();
   });
   window.addEventListener('resize', () => { for (const t of tiles) if (t.hydra) resizeHydra(t); });
 
@@ -280,7 +315,8 @@ function main(PH) {
   function loop(now) {
     const dt = Math.min(100, now - last);
     last = now;
-    for (const t of tiles) if (t.hydra && t.playing && (t.visible || t.full)) t.hydra.tick(dt);
+    // with a viewer open only a full screen tile runs; the grid resumes on close
+    for (const t of tiles) if (t.hydra && t.playing && (t.full || (t.visible && !viewer))) t.hydra.tick(dt);
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);

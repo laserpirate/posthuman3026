@@ -137,23 +137,46 @@ for (const [w, hgt] of SIZES) {
   await shot('p3-kodamas', page);
   await page.locator('.card').nth(1).locator('[data-act=preview]').tap();
 
-  // kodama full screen viewer
-  await page.locator('.card').nth(4).locator('[data-act=full]').tap();
+  // kodama full screen viewer with the floating close
+  const fxState = () => page.evaluate(() => {
+    const fx = document.getElementById('fx'), r = fx.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    const body = document.getElementById('fs-body').getBoundingClientRect();
+    const hidden = el => !el || getComputedStyle(el).display === 'none';
+    return { w: Math.round(r.width), h: Math.round(r.height), inView: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight,
+      onTop: !!hit && !!hit.closest('#fx'), clearOfScene: document.getElementById('fs').hidden || r.bottom <= body.top,
+      oldHidden: hidden(document.getElementById('fs-close')) && hidden(document.querySelector('.stage.is-full .x')) };
+  });
+  const fxOk = x => x.w >= 44 && x.h >= 44 && x.inView && x.onTop && x.clearOfScene && x.oldHidden;
+  const kFull = page.locator('.card').nth(4).locator('[data-act=full]');
+  await kFull.scrollIntoViewIfNeeded();
+  const y0 = await page.evaluate(() => scrollY);
+  await kFull.tap();
   await page.waitForSelector('#fs:not([hidden]) iframe');
   await page.waitForTimeout(3500);
   const fsv = await page.evaluate(() => {
-    const c = document.getElementById('fs-close').getBoundingClientRect(), b = document.getElementById('fs-body').getBoundingClientRect();
-    const bar = document.querySelector('.fs-bar').getBoundingClientRect();
+    const b = document.getElementById('fs-body').getBoundingClientRect(), bar = document.querySelector('.fs-bar').getBoundingClientRect();
     const t = document.getElementById('fs-title');
-    return { closeIn: c.left >= 0 && c.right <= innerWidth && c.top >= 0 && c.bottom <= innerHeight, closeH: Math.round(c.height),
-      fill: Math.round(bar.height + b.height) === innerHeight, truncates: t.scrollWidth <= t.clientWidth || getComputedStyle(t).textOverflow === 'ellipsis' };
+    return { fill: Math.round(bar.height + b.height) === innerHeight, truncates: t.scrollWidth <= t.clientWidth || getComputedStyle(t).textOverflow === 'ellipsis' };
   });
   const fsd = await drawn(page, page.locator('#fs-body'));
-  check(`${tag} full screen viewer`, fsv.closeIn && fsv.closeH >= 40 && fsv.fill && fsv.truncates && fsd > 60, JSON.stringify({ ...fsv, range: fsd }));
+  const kfx = await fxState();
+  check(`${tag} kodama viewer: floating close`, fxOk(kfx) && fsv.fill && fsv.truncates && fsd > 60, JSON.stringify({ ...kfx, ...fsv, range: fsd }));
   await shot('p5-fullscreen');
-  await page.tap('#fs-close');
-  await page.waitForTimeout(300);
-  check(`${tag} full screen closes`, await page.locator('#fs').isHidden());
+  await page.tap('#fx');
+  await page.waitForTimeout(400);
+  const kClosed = await page.evaluate(y0 => ({ hidden: document.getElementById('fs').hidden, focus: document.activeElement.dataset.act === 'full'
+    && document.activeElement.closest('.card') === document.querySelectorAll('.card')[4], scroll: Math.abs(scrollY - y0) <= 2,
+    state: history.state === null || !history.state.phViewer, len: history.length }), y0);
+  check(`${tag} kodama viewer: tap closes, focus + scroll restored`, kClosed.hidden && kClosed.focus && kClosed.scroll && kClosed.state, JSON.stringify(kClosed));
+  await kFull.tap();
+  await page.waitForSelector('#fs:not([hidden])');
+  await page.waitForTimeout(800);
+  await page.goBack();
+  await page.waitForTimeout(400);
+  const kBack = await page.evaluate(() => ({ hidden: document.getElementById('fs').hidden, len: history.length, onSite: !!document.getElementById('kodamas') }));
+  check(`${tag} kodama viewer: back closes, stays on site, no history pile-up`,
+    kBack.hidden && kBack.onSite && page.url().startsWith(BASE) && kBack.len === kClosed.len, JSON.stringify({ ...kBack, before: kClosed.len, url: page.url() }));
 
   // hydras
   await page.evaluate(() => document.getElementById('hydras').scrollIntoView());
@@ -188,24 +211,44 @@ for (const [w, hgt] of SIZES) {
   await shot('p4-hydras');
 
   // hydra full screen with the code panel open
-  const t0 = page.locator('.tile').first();
-  await t0.scrollIntoViewIfNeeded();
-  await t0.locator('[data-act=full]').tap();
+  const t0 = page.locator('.tile').first(), hFull = t0.locator('[data-act=full]');
+  await hFull.scrollIntoViewIfNeeded();
+  const hy0 = await page.evaluate(() => scrollY);
+  await hFull.tap();
   await page.waitForTimeout(500);
-  await page.evaluate(() => { const t = window.__ph.tiles[0]; t.pre.hidden = false; });
+  await page.evaluate(() => { window.__ph.tiles[0].pre.hidden = false; });
   await page.waitForTimeout(300);
-  const hf = await page.evaluate(() => {
-    const st = document.querySelector('.stage.is-full'), x = st.querySelector('.x').getBoundingClientRect(), r = st.getBoundingClientRect();
-    const hit = document.elementFromPoint(x.left + x.width / 2, x.top + x.height / 2);
-    return { fill: Math.round(r.height) === innerHeight && Math.round(r.width) === innerWidth, xOnTop: !!hit && hit.classList.contains('x'),
-      xIn: x.top >= 0 && x.right <= innerWidth, xH: Math.round(x.height), canvas: st.querySelector('canvas').width + 'x' + st.querySelector('canvas').height };
+  const hfx = await fxState();
+  const hf = await page.evaluate(async () => {
+    const st = document.querySelector('.stage.is-full'), r = st.getBoundingClientRect();
+    const others = window.__ph.tiles.slice(1).filter(t => t.hydra), t0 = window.__ph.tiles[0];
+    const a = others.map(t => t.hydra.synth.time), a0 = t0.hydra.synth.time;
+    await new Promise(res => setTimeout(res, 400));
+    return { fill: Math.round(r.height) === innerHeight && Math.round(r.width) === innerWidth, fullRuns: t0.hydra.synth.time !== a0,
+      gridPaused: others.every((t, i) => t.hydra.synth.time === a[i]), canvas: st.querySelector('canvas').width + 'x' + st.querySelector('canvas').height };
   });
-  check(`${tag} hydra full screen + code panel`, hf.fill && hf.xOnTop && hf.xIn && hf.xH >= 40, JSON.stringify(hf));
+  check(`${tag} hydra full + code panel: floating close on top`, fxOk(hfx) && hf.fill && hf.fullRuns && hf.gridPaused, JSON.stringify({ ...hfx, ...hf }));
   await shot('p6-hydra-full');
+  await page.tap('#fx');
+  await page.waitForTimeout(400);
   await page.evaluate(() => { window.__ph.tiles[0].pre.hidden = true; });
-  await page.locator('.stage.is-full .x').tap();
-  await page.waitForTimeout(300);
-  check(`${tag} hydra full screen closes`, !(await page.$('.stage.is-full')));
+  const hClosed = await page.evaluate(y0 => ({ closed: !document.querySelector('.stage.is-full'), focus: document.activeElement.dataset.act === 'full'
+    && document.activeElement.closest('.tile') === document.querySelector('.tile'), scroll: Math.abs(scrollY - y0) <= 2,
+    resumed: (() => { const t = window.__ph.tiles[0]; return t.visible; })() }), hy0);
+  const resumed = await page.evaluate(async () => { const t = window.__ph.tiles[0], a = t.hydra.synth.time; await new Promise(r => setTimeout(r, 300)); return t.hydra.synth.time !== a; });
+  check(`${tag} hydra full: tap closes, focus + scroll restored, tiles resume`, hClosed.closed && hClosed.focus && hClosed.scroll && resumed, JSON.stringify({ ...hClosed, resumed }));
+  await hFull.tap();
+  await page.waitForTimeout(500);
+  await page.goBack();
+  await page.waitForTimeout(400);
+  const hBack = await page.evaluate(() => ({ closed: !document.querySelector('.stage.is-full'), onSite: !!document.getElementById('hydras') }));
+  check(`${tag} hydra full: back closes, stays on site`, hBack.closed && hBack.onSite && page.url().startsWith(BASE), JSON.stringify(hBack));
+  o = await overflow(page);
+  check(`${tag} no horizontal scroll after viewers`, o.ok, JSON.stringify(o));
+  // a second back leaves the site normally
+  await page.goBack();
+  await page.waitForTimeout(500);
+  check(`${tag} second back leaves the site`, !page.url().startsWith(BASE), page.url());
   await ctx.close();
 }
 

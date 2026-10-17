@@ -122,6 +122,18 @@ await frame.locator('body').click({ position: { x: 5, y: 5 }, force: true }).cat
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 check('Esc inside scene closes full screen', await page.locator('#fs').isHidden());
+await page.locator('.card').nth(2).locator('[data-act=full]').click();
+await page.waitForSelector('#fs:not([hidden]) iframe');
+const fxDesk = await page.evaluate(() => getComputedStyle(document.getElementById('fx')).display);
+await page.click('#fs-close');
+await page.waitForTimeout(300);
+const closedByBtn = await page.locator('#fs').isHidden();
+await page.locator('.card').nth(2).locator('[data-act=full]').click();
+await page.waitForSelector('#fs:not([hidden])');
+await page.goBack();
+await page.waitForTimeout(300);
+check('desktop: header close and back close the viewer, floating close hidden',
+  closedByBtn && await page.locator('#fs').isHidden() && page.url().startsWith(BASE) && fxDesk === 'none', `fx=${fxDesk}`);
 
 await page.locator('#hydras').scrollIntoViewIfNeeded();
 await page.evaluate(() => document.getElementById('hydras').scrollIntoView());
@@ -149,6 +161,11 @@ const p2 = await page.evaluate(() => window.__ph.tiles[0].hydra.synth.time);
 check('hydra pause stops time', p1 === p2 && p1 > before);
 await page.locator('.tile').first().locator('[data-act=code]').click();
 check('code overlay shows sketch', (await page.locator('.tile').first().locator('pre').isVisible()));
+await page.locator('.tile').nth(1).locator('[data-act=full]').click();
+await page.waitForTimeout(400);
+await page.locator('.stage.is-full .x').click();
+await page.waitForTimeout(400);
+check('desktop: hydra full screen close button', !(await page.$('.stage.is-full')));
 
 await page.evaluate(() => window.scrollTo(0, 0));
 await page.waitForTimeout(800);
