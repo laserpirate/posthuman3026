@@ -145,9 +145,10 @@ for (const [w, hgt] of SIZES) {
     const hidden = el => !el || getComputedStyle(el).display === 'none';
     return { w: Math.round(r.width), h: Math.round(r.height), inView: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight,
       onTop: !!hit && !!hit.closest('#fx'), clearOfScene: document.getElementById('fs').hidden || r.bottom <= body.top,
+      clearOfTitle: document.getElementById('fs').hidden || r.right + 4 <= document.getElementById('fs-title').getBoundingClientRect().left,
       oldHidden: hidden(document.getElementById('fs-close')) && hidden(document.querySelector('.stage.is-full .x')) };
   });
-  const fxOk = x => x.w >= 44 && x.h >= 44 && x.inView && x.onTop && x.clearOfScene && x.oldHidden;
+  const fxOk = x => x.w >= 44 && x.h >= 44 && x.inView && x.onTop && x.clearOfScene && x.clearOfTitle && x.oldHidden;
   const kFull = page.locator('.card').nth(4).locator('[data-act=full]');
   await kFull.scrollIntoViewIfNeeded();
   const y0 = await page.evaluate(() => scrollY);
