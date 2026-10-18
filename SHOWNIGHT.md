@@ -18,7 +18,7 @@ Chrome is the primary browser on Windows and macOS. Safari on the Mac is a backu
 
 - Auto-drop is on everywhere: under 24 fps for 5 s drops one level. The Hydras section's **Quality** menu shows
   `Auto · <level>`, which tells you at a glance which GPU Chrome picked up. If Luna shows `Auto · med`, Chrome is on the iGPU.
-- Levels: **low** 960x540, 30 fps cap, 1 tile runs · **med** 1280x720, 30 fps (60 on Apple), 3 tiles · **high** 1920x1080, 60 fps, 6 tiles.
+- Levels: **low** 960x540, 30 fps cap, 1 tile runs · **med** 1280x720, 30 fps (60 on Apple), 3 tiles · **high** 1920x1080, 60 fps, all tiles.
 - Output canvases never render above devicePixelRatio 1 (Retina and HiDPI screens included). Full screen is 720p or more.
 
 ### Measured (Polaris stand-ins, 18 Oct 2026; two heaviest sketches, nesso_0 + ritchse_1)
@@ -92,7 +92,7 @@ Prefer wired: Luna's Ethernet expansion card into the venue switch. The relay's 
 
 ## Keys (Phase 2)
 
-The `03 Set` controller keys (space, 1 to 6, arrows, T, B, H, A, Esc) and the `?` help card arrive in Phase 2.
+The `03 Set` controller keys (space, 1 to 7, arrows, T, B, H, A, Esc) and the `?` help card arrive in Phase 2.
 On the demo site today: **Esc** closes a full screen viewer.
 
 ## Panic

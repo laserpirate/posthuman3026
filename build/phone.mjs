@@ -183,7 +183,7 @@ for (const [w, hgt] of SIZES) {
   await page.evaluate(() => document.getElementById('hydras').scrollIntoView());
   await page.waitForFunction(() => window.__ph.tiles.some(t => t.hydra), null, { timeout: 30000 });
   const sizes = [], diffs = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 7; i++) {
     const t = page.locator('.tile').nth(i);
     await t.scrollIntoViewIfNeeded();
     await page.waitForFunction(i => window.__ph.tiles[i].hydra, i, { timeout: 30000 });

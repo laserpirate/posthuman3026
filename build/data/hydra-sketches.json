@@ -26,6 +26,10 @@
   {
    "id": "ritchse_4",
    "code": "// disintegration\n// by Ritchse\n// instagram.com/ritchse\n \nosc(5,.1).modulate(noise(6),.22).diff(o0)\n  \t.modulateScrollY(osc(2).modulate(osc().rotate(),.11))\n\t.scale(.72).color(0.99,1.014,1)\n  \t.out()"
+  },
+  {
+   "id": "rangga_4",
+   "code": "// Sumet\n// by Rangga Purnama Aji\n// https://ranggapurnamaaji1.wixsite.com/portfolio\n\nosc(0.5,1.25).mult(shape(1,0.09).rotate(1.5))\n  .diff(gradient())\n  .add(shape(2,2).blend(gradient(1)))\n  .modulate(noise()\n            .modulate(noise().scrollY(1,0.0625)))\n  .blend(o0)\n  .color(1,-0.5,-0.75)\n  .out()"
   }
  ]
 }

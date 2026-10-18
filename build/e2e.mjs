@@ -159,14 +159,15 @@ await page.evaluate(() => document.getElementById('hydras').scrollIntoView());
 await page.waitForFunction(() => window.__ph.tiles.every(t => t.hydra), null, { timeout: 30000 });
 await page.waitForTimeout(3000);
 const diffs = [];
-for (let i = 0; i < 6; i++) {
+const nTiles = await page.locator('.tile').count();
+for (let i = 0; i < nTiles; i++) {
   const t = page.locator('.tile').nth(i);
   await t.scrollIntoViewIfNeeded();
   await page.waitForTimeout(600);
   diffs.push(await drawn(page, t.locator('canvas')));
 }
 const ids = await page.$$eval('.tile', els => els.map(e => e.dataset.sketch));
-check('six hydra canvases draw', diffs.every(d => d > 30), ids.map((id, i) => id + ':' + diffs[i]).join(' '));
+check('seven hydra canvases draw', nTiles === 7 && diffs.every(d => d > 30), ids.map((id, i) => id + ':' + diffs[i]).join(' '));
 await page.evaluate(() => document.getElementById('hydras').scrollIntoView());
 await page.waitForTimeout(800);
 await shot(page, '4-hydras');

@@ -6,7 +6,7 @@ Live: https://laserpirate.github.io/posthuman3026/
 
 - **01 Phylla Kodamas**: 12 kodama scenes (three.js r128, allowlisted by kID in `build/build.mjs`) in two groups
   with still plates, search, group chips, one live preview at a time and full screen. All Phylla Kodamas are original works by Marko Manriquez; no reproduction.
-- **02 Hydras**: six live sketches from the Hydra gallery by their credited artists (CC BY-NC-SA 4.0), run with hydra-synth by Olivia Jack (AGPL-3.0).
+- **02 Hydras**: seven live sketches from the Hydra gallery by their credited artists (CC BY-NC-SA 4.0), run with hydra-synth by Olivia Jack (AGPL-3.0).
   Per tile: audio toggle (mic or line-in, input picker, hydra's band meters) driving a master FX applied after the
   sketch on a second hydra canvas (zoom pump, bass flash, optional kaleid; React / Smooth / Scale sliders). Sketches stay verbatim.
   Quality levels (low / med / high) pick render size, fps cap and how many tiles run; the starting level comes from
@@ -72,7 +72,7 @@ GitHub Pages ignores `_headers`; there the meta tags and robots files do the wor
 
 ## Credits
 
-- Hydra sketches: Celeste Betancur, Ritchse, Nesso, Marianne Teixido, ΔNDR0M3DΔ. CC BY-NC-SA 4.0.
+- Hydra sketches: Celeste Betancur, Ritchse, Nesso, Marianne Teixido, ΔNDR0M3DΔ, Rangga Purnama Aji. CC BY-NC-SA 4.0.
   Source: `hydra-synth/hydra` `src/stores/examples.json`, copied verbatim into `build/data/hydra-sketches.json`.
 - hydra-synth by Olivia Jack, AGPL-3.0. Vendored unmodified with its license in `docs/vendor/hydra-synth/`.
 - three.js r128, MIT, loaded from cdnjs.

@@ -225,7 +225,7 @@ function main(PH) {
   const LEVEL = {
     low: { w: 960, h: 540, fps: 30, tile: 480, live: 1 },
     med: { w: 1280, h: 720, fps: 30, tile: 640, live: 3 },
-    high: { w: 1920, h: 1080, fps: 60, tile: 960, live: 6 },
+    high: { w: 1920, h: 1080, fps: 60, tile: 960, live: Infinity },
   };
 
   function gpuName() {
