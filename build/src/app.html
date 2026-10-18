@@ -35,6 +35,20 @@
       <p><strong>Not Marko Manriquez's work.</strong> These six sketches are by the artists credited on each tile, from the Hydra gallery, and are licensed <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-NC-SA 4.0</a>. Code shown verbatim.</p>
       <p>Running live in <a href="https://github.com/hydra-synth/hydra-synth" target="_blank" rel="noopener noreferrer">hydra-synth</a> by Olivia Jack (AGPL-3.0).</p>
     </div>
+    <div class="filters hbar">
+      <label class="fld">Quality
+        <select id="h-q">
+          <option value="auto">Auto</option>
+          <option value="low">Low · 540p 30</option>
+          <option value="med">Med · 720p</option>
+          <option value="high">High · 1080p 60</option>
+        </select>
+      </label>
+      <label class="fld fld-in" id="h-in-f" hidden>Audio input
+        <select id="h-in"></select>
+      </label>
+      <span class="shown" id="h-msg" aria-live="polite"></span>
+    </div>
     <div class="tiles" id="tiles"></div>
   </section>
 </main>

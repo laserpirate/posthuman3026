@@ -15,6 +15,25 @@ const SHOTS = si > -1 ? path.resolve(process.argv[si + 1]) : null;
 if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
 const GPU_ARGS = ['--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=d3d11'];
 
+// fake line-in: 10 s of 55 Hz kicks at 2 per second over a little hiss, looped by Chromium
+function fakeBass(file) {
+  const rate = 48000, n = rate * 10, data = Buffer.alloc(44 + n * 2);
+  data.write('RIFF', 0); data.writeUInt32LE(36 + n * 2, 4); data.write('WAVEfmt ', 8);
+  data.writeUInt32LE(16, 16); data.writeUInt16LE(1, 20); data.writeUInt16LE(1, 22);
+  data.writeUInt32LE(rate, 24); data.writeUInt32LE(rate * 2, 28); data.writeUInt16LE(2, 32); data.writeUInt16LE(16, 34);
+  data.write('data', 36); data.writeUInt32LE(n * 2, 40);
+  for (let i = 0; i < n; i++) {
+    const t = i / rate, k = t % 0.5;
+    const v = Math.sin(2 * Math.PI * 55 * k) * Math.exp(-k * 9) * 0.9 + (Math.random() * 2 - 1) * 0.04;
+    data.writeInt16LE(Math.round(Math.max(-1, Math.min(1, v)) * 32767), 44 + i * 2);
+  }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, data);
+  return file;
+}
+const WAV = fakeBass(path.join(HERE, '.cache', 'fake-bass.wav'));
+const MEDIA_ARGS = ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--use-file-for-fake-audio-capture=' + WAV];
+
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.woff2': 'font/woff2', '.txt': 'text/plain' };
 const server = http.createServer((req, res) => {
   const p = path.join(DOCS, decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/\/$/, '/index.html'));
@@ -46,7 +65,7 @@ async function drawn(page, locator) {
   }, buf.toString('base64'));
 }
 
-const browser = await chromium.launch({ args: GPU_ARGS });
+const browser = await chromium.launch({ args: [...GPU_ARGS, ...MEDIA_ARGS] });
 {
   const p = await browser.newPage();
   console.log('renderer:', await p.evaluate(() => {
@@ -174,6 +193,92 @@ const offscreen = await page.evaluate(async () => {
   await new Promise(r => setTimeout(r, 500)); return [t.visible, t.hydra.synth.time === a];
 });
 check('off-screen tiles do not tick', !offscreen[0] && offscreen[1]);
+
+// ---- quality ----
+console.log('quality profile:', await page.evaluate(() => JSON.stringify({ gpu: window.__ph.q.gpu, ...window.__ph.q.prof })));
+await page.evaluate(() => document.getElementById('hydras').scrollIntoView());
+await page.waitForTimeout(800);
+const runCount = () => page.evaluate(async () => {
+  const ts = window.__ph.tiles, a = ts.map(t => t.hydra && t.hydra.synth.time);
+  await new Promise(r => setTimeout(r, 600));
+  return { ran: ts.filter((t, i) => t.hydra && t.hydra.synth.time !== a[i]).length, visible: ts.filter(t => t.visible).length };
+});
+await page.selectOption('#h-q', 'low');
+await page.waitForTimeout(300);
+const lowRun = await runCount();
+const lowFps = await page.evaluate(async () => { await new Promise(r => setTimeout(r, 2500)); return window.__ph.q.guard.fps; });
+const lowTile = await page.evaluate(() => Math.max(window.__ph.tiles[0].canvas.width, window.__ph.tiles[0].canvas.height));
+check('quality low: one tile runs, 30 fps cap, tile <= 480', lowRun.ran === 1 && lowRun.visible >= 3 && lowFps > 25 && lowFps < 32 && lowTile <= 480,
+  JSON.stringify({ ...lowRun, fps: +lowFps.toFixed(1), tile: lowTile }));
+await page.selectOption('#h-q', 'med');
+await page.waitForTimeout(300);
+const medRun = await runCount();
+check('quality med: up to three tiles run', medRun.ran === Math.min(3, medRun.visible), JSON.stringify(medRun));
+await page.locator('.tile').nth(1).locator('[data-act=full]').click();
+await page.waitForTimeout(600);
+const fsSize = await page.evaluate(() => { const c = window.__ph.tiles[1].canvas; return [c.width, c.height]; });
+await page.locator('.stage.is-full .x').click();
+await page.waitForTimeout(300);
+check('full screen renders at 720p class (long side 1280) at med', fsSize[0] === 1280, fsSize.join('x'));
+await page.selectOption('#h-q', 'auto');
+await page.waitForTimeout(300);
+const autoRun = await runCount();
+const autoWant = await page.evaluate(() => Math.min(window.__ph.q.cfg.live, window.__ph.tiles.filter(t => t.visible && t.playing).length));
+check('quality auto follows the GPU profile', autoRun.ran === autoWant, JSON.stringify({ ...autoRun, want: autoWant }));
+const drop = await page.evaluate(() => {
+  let drops = 0;
+  const g = window.__ph.makeGuard(() => drops++);
+  let t = 1000;
+  for (let i = 0; i < 4.5 * 20; i++) g.frame(t += 50);   // 20 fps for 4.5 s: not yet
+  const early = drops;
+  for (let i = 0; i < 2 * 20; i++) g.frame(t += 50);     // past 5 s: one drop
+  const at5 = drops;
+  for (let i = 0; i < 3 * 30; i++) g.frame(t += 33.4);   // 30 fps: no more
+  return { early, at5, after: drops };
+});
+check('auto-drop after 5 s under 24 fps', drop.early === 0 && drop.at5 === 1 && drop.after === 1, JSON.stringify(drop));
+
+// ---- audio ----
+const t0 = page.locator('.tile').first();
+await t0.scrollIntoViewIfNeeded();
+if (!(await page.evaluate(() => window.__ph.tiles[0].playing))) await t0.locator('[data-act=play]').click();
+await t0.locator('.acts [data-act=audio]').click();
+await page.waitForFunction(() => { const t = window.__ph.tiles[0]; return t.fx && t.fx.synth.a.meyda; }, null, { timeout: 15000 });
+const inputs = await page.$$eval('#h-in option', os => os.map(o => o.textContent));
+check('audio: input picker lists devices after permission', inputs.length >= 1 && await page.locator('#h-in-f').isVisible(), inputs.join(' | '));
+const aud = await page.evaluate(async () => {
+  const t = window.__ph.tiles[0], fft = [], zoom = [];
+  for (let i = 0; i < 30; i++) { await new Promise(r => setTimeout(r, 70)); fft.push(t.fx.synth.a.fft[0]); zoom.push(t.fxv.zoom()); }
+  const meter = t.fx.synth.a.canvas, cs = getComputedStyle(meter);
+  const g = meter.getContext('2d').getImageData(0, 0, meter.width, meter.height).data;
+  let lit = 0; for (let i = 3; i < g.length; i += 4) if (g[i]) lit++;
+  return { fftMax: Math.max(...fft), zMin: Math.min(...zoom), zMax: Math.max(...zoom), meter: cs.display !== 'none' && lit > 50,
+    raw: (s => ({ ec: s.echoCancellation, ns: s.noiseSuppression, agc: s.autoGainControl }))(t.fx.synth.a.stream.getAudioTracks()[0].getSettings()) };
+});
+check('audio: fake line-in moves the bass band and the meters', aud.fftMax > 0.05 && aud.meter, JSON.stringify(aud));
+check('audio: master FX zoom pumps with the bass', aud.zMax - aud.zMin > 0.01 && aud.zMin >= 1, `zoom ${aud.zMin.toFixed(3)}..${aud.zMax.toFixed(3)}`);
+check('audio: voice processing off on the input', aud.raw.ec === false && aud.raw.ns === false && aud.raw.agc === false, JSON.stringify(aud.raw));
+const fxDiff = await drawn(page, t0.locator('canvas.fxc'));
+check('audio: FX canvas draws the sketch', fxDiff > 30, 'range ' + fxDiff);
+await shot(page, '7-hydra-audio');
+await page.evaluate(() => { const r = document.querySelector('.tile .ab-s input'); r.value = '0'; r.dispatchEvent(new Event('input')); });
+const z0 = await page.evaluate(async () => { const t = window.__ph.tiles[0], z = []; for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 60)); z.push(t.fxv.zoom()); } return z; });
+check('audio: react 0 holds the FX still', z0.every(v => v === 1));
+check('audio: sketch code unchanged', await page.evaluate(() => window.__ph.tiles[0].pre.textContent === window.__ph.tiles[0].s.code));
+await t0.locator('[data-act=full]').click();
+await page.waitForTimeout(600);
+const fsAudio = await page.evaluate(() => {
+  const st = document.querySelector('.stage.is-full'), b = st.querySelector('.ab [data-act=audio]'), r = b.getBoundingClientRect();
+  return { btn: getComputedStyle(b).display !== 'none' && r.width > 0, pressed: b.getAttribute('aria-pressed'), meter: !!st.querySelector('.meter') };
+});
+await shot(page, '8-hydra-full-audio');
+await page.locator('.stage.is-full .ab [data-act=audio]').click();
+await page.waitForTimeout(300);
+const off = await page.evaluate(() => { const t = window.__ph.tiles[0]; return { fx: !!t.fx, meter: !!t.stage.querySelector('.meter'), fxc: !!t.stage.querySelector('.fxc') }; });
+await page.locator('.stage.is-full .x').click();
+await page.waitForTimeout(300);
+check('audio: toggle in full screen, off removes FX and meters', fsAudio.btn && fsAudio.pressed === 'true' && fsAudio.meter && !off.fx && !off.meter && !off.fxc,
+  JSON.stringify({ ...fsAudio, ...off }));
 
 // ---- mobile ----
 const m = await newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });

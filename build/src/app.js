@@ -218,26 +218,136 @@ function main(PH) {
   }
   document.addEventListener('keydown', onKey);
 
+
+  // ---- quality: one level picks render size, frame cap and how many tiles run ---------------
+
+  const LEVELS = ['low', 'med', 'high'];
+  const LEVEL = {
+    low: { w: 960, h: 540, fps: 30, tile: 480, live: 1 },
+    med: { w: 1280, h: 720, fps: 30, tile: 640, live: 3 },
+    high: { w: 1920, h: 1080, fps: 60, tile: 960, live: 6 },
+  };
+
+  function gpuName() {
+    try {
+      const gl = document.createElement('canvas').getContext('webgl');
+      if (!gl) return '';
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      const name = String((ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) || '');
+      const lose = gl.getExtension('WEBGL_lose_context');
+      if (lose) lose.loseContext();
+      return name;
+    } catch (e) { return ''; }
+  }
+
+  // starting level per machine: Luna (RX 7700S / 780M), the M4, Stardust (RTX 40 laptop), software GL
+  function profileFor(name) {
+    if (/swiftshader|llvmpipe|software|basic render/i.test(name)) return { level: 'low', fps60: false };
+    if (/RX\s*7700S/i.test(name)) return { level: 'high', fps60: true };
+    if (/RTX\s*(3080|3090|40[789]0|50[6-9]0)/i.test(name)) return { level: 'high', fps60: true };
+    if (/RTX|780M|Radeon\(TM\) Graphics|Radeon Graphics/i.test(name)) return { level: 'med', fps60: false };
+    if (/Apple/i.test(name)) return { level: 'med', fps60: true };
+    return { level: 'low', fps60: false };
+  }
+
+  // fps meter: after `secs` whole seconds under `min` fps, calls onDrop once and starts over
+  function makeGuard(onDrop, min = 24, secs = 5) {
+    let n = 0, t0 = 0, slow = 0, fps = 0;
+    return {
+      get fps() { return fps; },
+      frame(now) {
+        if (!t0 || now - t0 > 2000) { n = 0; t0 = now; return; } // first frame or back from a stall
+        n++;
+        if (now - t0 < 1000) return;
+        fps = n * 1000 / (now - t0);
+        n = 0; t0 = now;
+        slow = fps < min ? slow + 1 : 0;
+        if (slow >= secs) { slow = 0; onDrop(); }
+      },
+      idle() { n = 0; t0 = 0; slow = 0; },
+    };
+  }
+
+  const Q = (() => {
+    const gpu = gpuName(), prof = profileFor(gpu), subs = [];
+    let pick = 'auto';
+    try { pick = localStorage.getItem('ph.q') || 'auto'; } catch (e) { /* storage blocked */ }
+    let level = LEVELS.includes(pick) ? pick : prof.level, dropped = false;
+    const emit = () => subs.forEach(f => f());
+    const guard = makeGuard(() => {
+      if (level === 'low') return;
+      level = LEVELS[LEVELS.indexOf(level) - 1];
+      dropped = true;
+      emit();
+    });
+    return {
+      gpu, prof, guard,
+      get pick() { return pick; },
+      get level() { return level; },
+      get dropped() { return dropped; },
+      get cfg() { const c = LEVEL[level]; return level === 'med' && prof.fps60 ? { ...c, fps: 60 } : c; },
+      set(p) {
+        pick = p;
+        try { localStorage.setItem('ph.q', p); } catch (e) { /* storage blocked */ }
+        level = LEVELS.includes(p) ? p : prof.level;
+        dropped = false;
+        guard.idle();
+        emit();
+      },
+      on(f) { subs.push(f); },
+    };
+  })();
+
   // ---- hydras ---------------------------------------------------------------------------------
+
+  const hMsg = $('#h-msg');
+  const qSel = $('#h-q');
+  function syncQuality() {
+    qSel.value = Q.pick;
+    qSel.options[0].textContent = 'Auto · ' + Q.prof.level;
+    hMsg.textContent = Q.dropped ? 'Quality dropped to ' + Q.level : '';
+    for (const t of tiles) if (t.hydra) resizeHydra(t);
+  }
+  qSel.addEventListener('change', () => Q.set(qSel.value));
+
+  const slider = (label, min, max, step, value, on) => {
+    const input = h('input', { type: 'range', min, max, step, value: String(value) });
+    input.addEventListener('input', () => on(Number(input.value)));
+    return h('label', { class: 'sl' }, h('span', { text: label }), input);
+  };
 
   const tilesEl = $('#tiles');
   const tiles = D.hydras.map(s => {
-    const canvas = h('canvas', { 'aria-label': s.title + ' by ' + s.artist });
+    const canvas = h('canvas', { class: 'sk', 'aria-label': s.title + ' by ' + s.artist });
     const pre = h('pre', { hidden: true, text: s.code });
     const x = h('button', { class: 'btn btn-sig x', type: 'button', text: 'Close' });
-    const stage = h('div', { class: 'stage' }, canvas, pre, x);
+    const t = { s, canvas, pre, hydra: null, visible: false, ratio: 0, playing: !reduceMotion, full: false,
+      audio: false, fx: null, fxc: null, fxv: null, react: 0.5, smooth: 0.6, scale: 16, kal: false };
+    // audio controls live inside the stage so they also show in element full screen
+    const abOn = h('button', { class: 'btn', type: 'button', 'data-act': 'audio', 'aria-pressed': 'false', text: 'Audio' });
+    const kal = h('button', { class: 'btn', type: 'button', 'data-act': 'kaleid', 'aria-pressed': 'false', text: 'Kaleid' });
+    const sls = h('div', { class: 'ab-s' },
+      slider('React', 0, 1, 0.01, t.react, v => { t.react = v; }),
+      slider('Smooth', 0, 0.95, 0.01, t.smooth, v => { t.smooth = v; if (t.fx) t.fx.synth.a.setSmooth(v); }),
+      slider('Scale', 2, 40, 1, t.scale, v => { t.scale = v; if (t.fx) t.fx.synth.a.setScale(v); }),
+      kal);
+    const ab = h('div', { class: 'ab' }, abOn, sls);
+    const stage = h('div', { class: 'stage' }, canvas, pre, ab, x);
     const play = h('button', { class: 'btn', type: 'button', 'data-act': 'play' });
     const code = h('button', { class: 'btn', type: 'button', 'data-act': 'code', 'aria-pressed': 'false', text: 'Code' });
+    const audio = h('button', { class: 'btn', type: 'button', 'data-act': 'audio', 'aria-pressed': 'false', text: 'Audio' });
     const full = h('button', { class: 'btn', type: 'button', 'data-act': 'full', text: 'Full screen' });
-    const orig = h('a', { class: 'btn', href: s.url, target: '_blank', rel: 'noopener noreferrer', text: 'Original' });
+    const orig = h('a', { class: 'btn', href: s.url, target: '_blank', rel: 'noopener noreferrer', text: 'Edit in Hydra' });
     const by = h('p', { class: 'by' }, 'by ', s.link
       ? h('a', { href: s.link, target: '_blank', rel: 'noopener noreferrer', text: s.artist }) : s.artist);
     const el = h('article', { class: 'tile', 'data-sketch': s.id }, stage,
-      h('div', { class: 'tile-b' }, h('h4', { text: s.title }), by, h('div', { class: 'acts' }, play, code, full, orig)));
+      h('div', { class: 'tile-b' }, h('h4', { text: s.title }), by, h('div', { class: 'acts' }, play, code, audio, full, orig)));
     tilesEl.append(el);
-    const t = { s, el, stage, canvas, pre, play, hydra: null, visible: false, playing: !reduceMotion, full: false };
+    Object.assign(t, { el, stage, play, audioBtns: [audio, abOn] });
     play.addEventListener('click', () => { t.playing = !t.playing; syncPlay(t); });
     code.addEventListener('click', () => { pre.hidden = !pre.hidden; code.setAttribute('aria-pressed', String(!pre.hidden)); });
+    for (const b of t.audioBtns) b.addEventListener('click', () => setAudio(t, !t.audio));
+    kal.addEventListener('click', () => { t.kal = !t.kal; kal.setAttribute('aria-pressed', String(t.kal)); });
     full.addEventListener('click', () => { setFull(t, true); enterViewer(stage, full, () => setFull(t, false)); });
     x.addEventListener('click', () => leaveViewer());
     syncPlay(t);
@@ -249,12 +359,14 @@ function main(PH) {
     t.play.setAttribute('aria-pressed', String(!t.playing));
   }
 
-  // phones: long side capped at 480 in a tile, 720 full screen
+  // long side capped per quality level (phones: 480 in a tile, 720 full screen);
+  // full screen never renders above DPR 1 and stays at 720p or more
   const small = () => Math.min(innerWidth, innerHeight) <= 600;
   function sizeOf(t) {
     const r = t.canvas.getBoundingClientRect();
-    let s = Math.min(window.devicePixelRatio || 1, 1.5);
-    if (small()) s = Math.min(s, (t.full ? 720 : 480) / Math.max(r.width, r.height, 1));
+    const long = Math.max(r.width, r.height, 1);
+    const cap = small() ? (t.full ? 720 : 480) : (t.full ? Math.max(1280, Q.cfg.w) : Q.cfg.tile);
+    const s = Math.min(t.full ? 1 : Math.min(window.devicePixelRatio || 1, 1.5), cap / long);
     return [Math.max(2, Math.round(r.width * s)), Math.max(2, Math.round(r.height * s))];
   }
 
@@ -270,13 +382,16 @@ function main(PH) {
     // sketches run against this instance only; `with` keeps `time` live per instance
     new Function('h', 'with(h){' + t.s.code + '\n}')(t.hydra.synth);
     t.hydra.tick(16); // one frame so a paused tile is not blank
+    if (t.audio) fxOn(t);
   }
 
   function resizeHydra(t) {
     if (!t.hydra) return;
     const [w, hgt] = sizeOf(t);
+    if (w === t.canvas.width && hgt === t.canvas.height) return;
     t.hydra.setResolution(w, hgt);
-    if (!t.playing) t.hydra.tick(0);
+    if (t.fx) t.fx.setResolution(w, hgt);
+    if (!t.playing) { t.hydra.tick(0); if (t.fx) t.fx.tick(0); }
   }
 
   function setFull(t, on) {
@@ -292,6 +407,108 @@ function main(PH) {
   });
   window.addEventListener('resize', () => { for (const t of tiles) if (t.hydra) resizeHydra(t); });
 
+  // ---- audio: one input stream, hydra's own analyser per tile, master FX after the sketch -----
+  // Sketches stay verbatim. A second small hydra canvas pulls the tile in with s0.init and adds
+  // a zoom pump and a flash on the bass band, and an optional kaleid on the high band.
+
+  const inFld = $('#h-in-f'), inSel = $('#h-in');
+  // line feeds want the raw signal: no voice processing
+  const RAW = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+  const input = { stream: null, id: '' };
+
+  function openInput(id) {
+    if (input.stream && input.id === id) return Promise.resolve(input.stream);
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return Promise.reject(new Error('no audio input'));
+    return navigator.mediaDevices.getUserMedia({ audio: id ? { ...RAW, deviceId: { exact: id } } : RAW, video: false })
+      .then(stream => {
+        if (input.stream) input.stream.getTracks().forEach(k => k.stop());
+        input.stream = stream; input.id = id;
+        return listInputs().then(() => stream);
+      });
+  }
+
+  // device labels are only readable once permission is granted
+  function listInputs() {
+    return navigator.mediaDevices.enumerateDevices().then(ds => {
+      const cur = input.stream.getAudioTracks()[0].getSettings().deviceId;
+      inSel.textContent = '';
+      for (const d of ds.filter(x => x.kind === 'audioinput')) {
+        inSel.append(h('option', { value: d.deviceId, text: d.label || 'Input ' + (inSel.length + 1) }));
+      }
+      if (cur && [...inSel.options].some(o => o.value === cur)) inSel.value = cur;
+      inFld.hidden = false;
+    });
+  }
+  inSel.addEventListener('change', () => {
+    openInput(inSel.value).then(() => {
+      for (const t of tiles) if (t.fx) { fxOff(t); fxOn(t); }
+    }).catch(audioFailed);
+  });
+
+  function audioFailed(err) {
+    console.warn(err);
+    hMsg.textContent = err && err.name === 'NotAllowedError' ? 'Audio input blocked' : 'No audio input';
+    for (const t of tiles) if (t.audio && !t.fx) setAudio(t, false);
+  }
+
+  function setAudio(t, on) {
+    t.audio = on;
+    t.stage.classList.toggle('is-audio', on);
+    for (const b of t.audioBtns) b.setAttribute('aria-pressed', String(on));
+    if (on) fxOn(t); else fxOff(t);
+  }
+
+  function fxOn(t) {
+    if (!t.hydra || t.fx) return;
+    openInput(input.id).then(stream => {
+      if (!t.audio || t.fx) return;
+      const c = h('canvas', { class: 'fxc', 'aria-hidden': 'true' });
+      c.width = t.canvas.width; c.height = t.canvas.height;
+      t.stage.insertBefore(c, t.pre);
+      const F = new window.Hydra({
+        canvas: c, width: c.width, height: c.height, autoLoop: false, makeGlobal: false,
+        detectAudio: false, enableStreamCapture: false,
+      });
+      // hydra's Audio asks for the default mic with voice processing on; hand it our stream
+      const md = navigator.mediaDevices;
+      md.getUserMedia = () => Promise.resolve(stream.clone());
+      try { F._initAudio(); } finally { delete md.getUserMedia; }
+      F.detectAudio = true;
+      const s = F.synth, a = s.a;
+      a.setSmooth(t.smooth); a.setScale(t.scale); a.show();
+      a.canvas.classList.add('meter');
+      const bass = () => Math.min(1.5, a.fft[0]), high = () => Math.min(1.5, a.fft[3]);
+      t.fxv = {
+        zoom: () => 1 + bass() * 0.25 * t.react,
+        flash: () => bass() * bass() * 0.3 * t.react,
+        kal: () => (t.kal ? Math.min(1, high() * t.react) : 0),
+      };
+      s.s0.init({ src: t.canvas });
+      s.src(s.s0).scale(t.fxv.zoom)
+        .blend(s.src(s.s0).kaleid(4).scale(t.fxv.zoom), t.fxv.kal)
+        .brightness(t.fxv.flash)
+        .out(s.o0);
+      F.tick(16);
+      t.fx = F; t.fxc = c;
+    }).catch(audioFailed);
+  }
+
+  function fxOff(t) {
+    if (!t.fx) return;
+    const a = t.fx.synth.a;
+    try {
+      if (a.stream) a.stream.getTracks().forEach(k => k.stop());
+      if (a.context) a.context.close();
+      a.canvas.remove();
+      const lose = t.fx.regl._gl.getExtension('WEBGL_lose_context');
+      if (lose) lose.loseContext();
+    } catch (e) { console.warn(e); }
+    t.fxc.remove();
+    t.fx = null; t.fxc = null; t.fxv = null;
+  }
+
+  // ---- loop -----------------------------------------------------------------------------------
+
   let hydraLib = null;
   function loadHydraLib() {
     return hydraLib || (hydraLib = new Promise((res, rej) => {
@@ -301,25 +518,45 @@ function main(PH) {
     }));
   }
 
-  // only tiles on screen tick
+  // tiles near the screen get an instance; the most visible ones (up to the level's budget) run,
+  // the rest hold their last frame
   const tileIO = new IntersectionObserver(entries => {
     for (const e of entries) {
       const t = tiles.find(x => x.el === e.target);
       t.visible = e.isIntersecting;
+      t.ratio = e.intersectionRatio;
       if (t.visible && !t.hydra) loadHydraLib().then(() => { if (!t.hydra) startHydra(t); }).catch(err => console.error(err));
     }
-  }, { rootMargin: '100px 0px' });
+  }, { rootMargin: '100px 0px', threshold: [0, 0.25, 0.5, 0.75, 1] });
   for (const t of tiles) tileIO.observe(t.el);
 
-  let last = performance.now();
-  function loop(now) {
-    const dt = Math.min(100, now - last);
-    last = now;
+  function liveTiles() {
     // with a viewer open only a full screen tile runs; the grid resumes on close
-    for (const t of tiles) if (t.hydra && t.playing && (t.full || (t.visible && !viewer))) t.hydra.tick(dt);
+    if (viewer) return tiles.filter(t => t.full && t.hydra && t.playing);
+    return tiles.filter(t => t.hydra && t.playing && t.visible)
+      .sort((a, b) => b.ratio - a.ratio).slice(0, Q.cfg.live);
+  }
+
+  let last = performance.now(), acc = 0;
+  function loop(now) {
+    acc += Math.min(100, now - last);
+    last = now;
+    // frame cap, with 1 ms of slack for rAF jitter
+    if (acc >= 1000 / Q.cfg.fps - 1) {
+      const live = liveTiles();
+      for (const t of live) {
+        t.hydra.tick(acc);
+        if (t.fx) t.fx.tick(acc);
+      }
+      if (live.length) Q.guard.frame(now); else Q.guard.idle();
+      acc = 0;
+    }
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
 
-  window.__ph = { cards: cardEls.length, tiles };
+  Q.on(syncQuality);
+  syncQuality();
+
+  window.__ph = { cards: cardEls.length, tiles, q: Q, makeGuard, liveTiles };
 }
