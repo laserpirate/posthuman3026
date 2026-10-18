@@ -281,6 +281,81 @@ await page.waitForTimeout(300);
 check('audio: toggle in full screen, off removes FX and meters', fsAudio.btn && fsAudio.pressed === 'true' && fsAudio.meter && !off.fx && !off.meter && !off.fxc,
   JSON.stringify({ ...fsAudio, ...off }));
 
+// ---- 03 Set ----
+await page.evaluate(() => window.scrollTo(0, 0));
+await page.click('#nav-set');
+await page.waitForFunction(() => window.__ph.set.ready && !document.getElementById('set').hidden, null, { timeout: 30000 });
+await page.waitForTimeout(1500);
+const SS = () => page.evaluate(() => {
+  const s = window.__ph.set;
+  return { fader: s.fader, a: s.decks[0].item, b: s.decks[1].item, ta: s.decks[0].hydra.synth.time, tb: s.decks[1].hydra.synth.time,
+    cr: document.getElementById('set-cr').textContent, black: !document.getElementById('set-black').hidden };
+});
+const s1 = await SS();
+await page.waitForTimeout(500);
+const s2 = await SS();
+const outDiff = await drawn(page, page.locator('#set-out canvas'));
+check('set: opens, deck A plays, idle deck B paused, output draws, credits on',
+  s1.a === 0 && s2.ta > s1.ta && s2.tb === s1.tb && outDiff > 30 && /· CC BY-NC-SA 4\.0$/.test(s1.cr), JSON.stringify({ ...s2, range: outDiff }));
+const fpsTxt = await page.textContent('#set-fps');
+check('set: fps readout in the controller only', /^fps \d+ · \w+$/.test(fpsTxt) && !(await page.locator('#set-out').innerText()).includes('fps'), fpsTxt);
+await shot(page, '9-set');
+await page.keyboard.press(' ');
+await page.waitForTimeout(1500);
+const mid = await page.evaluate(async () => {
+  const s = window.__ph.set, a = s.decks.map(d => d.hydra.synth.time);
+  await new Promise(r => setTimeout(r, 300));
+  return { fader: s.fader, both: s.decks.every((d, i) => d.hydra.synth.time !== a[i]) };
+});
+await page.keyboard.press('b');
+const bl = await SS();
+const blTop = await page.evaluate(() => { const e = document.elementFromPoint(innerWidth * 0.75, innerHeight * 0.5); return e && e.id; });
+await page.keyboard.press('b');
+await page.waitForTimeout(2200);
+const s3 = await SS();
+check('set: space crossfades over 3 s, both decks tick during it', mid.fader > 0.1 && mid.fader < 0.9 && mid.both && s3.fader === 1 && s3.b === 1,
+  JSON.stringify({ mid, after: { fader: s3.fader, b: s3.b } }));
+check('set: blackout mid-crossfade covers the output', bl.black && blTop === 'set-black', String(blTop));
+await page.keyboard.press('5');
+const cued = await SS();
+await page.keyboard.press('Shift+Space');
+await page.waitForTimeout(200);
+const s4 = await SS();
+check('set: 5 cues to the other deck, shift+space cuts', cued.a === 4 && cued.fader === 1 && s4.fader === 0, JSON.stringify({ cuedA: cued.a, fader: s4.fader }));
+await page.evaluate(() => { for (const r of document.querySelectorAll('#set-pl input[type=number]')) { r.value = '2'; r.dispatchEvent(new Event('change')); } });
+await page.waitForTimeout(5600);
+const s5 = await SS();
+await page.evaluate(() => { for (const r of document.querySelectorAll('#set-pl input[type=number]')) { r.value = '60'; r.dispatchEvent(new Event('change')); } });
+check('set: auto-advance by timer', s5.fader === 1 && s5.b === 5, JSON.stringify({ fader: s5.fader, b: s5.b }));
+await page.keyboard.press('h');
+await page.keyboard.press('b');
+const hb = await page.evaluate(() => [document.getElementById('set-ui').hidden, !document.getElementById('set-black').hidden]);
+await page.keyboard.press('b');
+await page.keyboard.press('h');
+await page.keyboard.press('?');
+const help = await page.locator('#set-help').isVisible();
+await shot(page, '10-set-help');
+await page.keyboard.press('b');
+const hb2 = !(await page.locator('#set-black').isHidden());
+await page.keyboard.press('b');
+await page.keyboard.press('?');
+check('set: H hides controls, ? shows the key card, blackout works in both', hb[0] && hb[1] && help && hb2, JSON.stringify({ hb, help, hb2 }));
+await page.keyboard.press('a');
+await page.waitForFunction(() => { const c = window.__ph.set.comp; return c.synth.a && c.synth.a.meyda; }, null, { timeout: 15000 });
+const sa = await page.evaluate(async () => {
+  const s = window.__ph.set, z = [];
+  for (let i = 0; i < 30; i++) { await new Promise(r => setTimeout(r, 70)); z.push(s.fxv.zoom()); }
+  return { zMin: Math.min(...z), zMax: Math.max(...z), meterInUi: !!document.querySelector('#set-ui .set-meter'), meterOnOutput: !!document.querySelector('#set-out canvas:not(.set-c)'),
+    inputs: document.querySelectorAll('#set-in option').length };
+});
+await shot(page, '11-set-audio');
+await page.keyboard.press('a');
+check('set: A audio with fake mic pumps the master FX, meter in the controller', sa.zMax - sa.zMin > 0.01 && sa.meterInUi && !sa.meterOnOutput && sa.inputs >= 1, JSON.stringify(sa));
+await page.keyboard.press('Escape');
+await page.waitForTimeout(600);
+const closed = await page.evaluate(() => document.getElementById('set').hidden && !window.__ph.set.open && !document.fullscreenElement);
+check('set: Esc exits', closed);
+
 // ---- mobile ----
 const m = await newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 await m.goto(BASE);

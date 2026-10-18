@@ -302,13 +302,21 @@ function main(PH) {
 
   const hMsg = $('#h-msg');
   const qSel = $('#h-q');
+  const setQ = $('#set-q');
+  for (const o of qSel.options) setQ.append(o.cloneNode(true));
   function syncQuality() {
-    qSel.value = Q.pick;
-    qSel.options[0].textContent = 'Auto · ' + Q.prof.level;
+    for (const sel of [qSel, setQ]) {
+      sel.value = Q.pick;
+      sel.options[0].textContent = 'Auto · ' + Q.prof.level;
+    }
     hMsg.textContent = Q.dropped ? 'Quality dropped to ' + Q.level : '';
     for (const t of tiles) if (t.hydra) resizeHydra(t);
+    if (S.ready) for (const hy of [...S.decks.map(d => d.hydra), S.comp]) {
+      if (hy.canvas.width !== Q.cfg.w) hy.setResolution(Q.cfg.w, Q.cfg.h);
+    }
   }
   qSel.addEventListener('change', () => Q.set(qSel.value));
+  setQ.addEventListener('change', () => Q.set(setQ.value));
 
   const slider = (label, min, max, step, value, on) => {
     const input = h('input', { type: 'range', min, max, step, value: String(value) });
@@ -411,7 +419,7 @@ function main(PH) {
   // Sketches stay verbatim. A second small hydra canvas pulls the tile in with s0.init and adds
   // a zoom pump and a flash on the bass band, and an optional kaleid on the high band.
 
-  const inFld = $('#h-in-f'), inSel = $('#h-in');
+  const inSels = [$('#h-in'), $('#set-in')];
   // line feeds want the raw signal: no voice processing
   const RAW = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
   const input = { stream: null, id: '' };
@@ -431,19 +439,43 @@ function main(PH) {
   function listInputs() {
     return navigator.mediaDevices.enumerateDevices().then(ds => {
       const cur = input.stream.getAudioTracks()[0].getSettings().deviceId;
-      inSel.textContent = '';
-      for (const d of ds.filter(x => x.kind === 'audioinput')) {
-        inSel.append(h('option', { value: d.deviceId, text: d.label || 'Input ' + (inSel.length + 1) }));
+      const ins = ds.filter(x => x.kind === 'audioinput');
+      for (const sel of inSels) {
+        sel.textContent = '';
+        ins.forEach((d, i) => sel.append(h('option', { value: d.deviceId, text: d.label || 'Input ' + (i + 1) })));
+        if (cur && ins.some(d => d.deviceId === cur)) sel.value = cur;
+        sel.closest('label').hidden = false;
       }
-      if (cur && [...inSel.options].some(o => o.value === cur)) inSel.value = cur;
-      inFld.hidden = false;
     });
   }
-  inSel.addEventListener('change', () => {
-    openInput(inSel.value).then(() => {
+  for (const sel of inSels) sel.addEventListener('change', () => {
+    openInput(sel.value).then(() => {
       for (const t of tiles) if (t.fx) { fxOff(t); fxOn(t); }
+      if (S.audio) { setAudioSet(false); setAudioSet(true); }
     }).catch(audioFailed);
   });
+
+  // hydra's Audio asks for the default mic with voice processing on; hand it our stream instead
+  function attachAudio(hy, stream, smooth, scale) {
+    const md = navigator.mediaDevices;
+    md.getUserMedia = () => Promise.resolve(stream.clone());
+    try { hy._initAudio(); } finally { delete md.getUserMedia; }
+    hy.detectAudio = true;
+    const a = hy.synth.a;
+    a.setSmooth(smooth); a.setScale(scale); a.show();
+    return a;
+  }
+  function detachAudio(hy) {
+    const a = hy.synth.a;
+    if (!a) return;
+    hy.detectAudio = false;
+    try {
+      if (a.stream) a.stream.getTracks().forEach(k => k.stop());
+      if (a.context) a.context.close();
+    } catch (e) { console.warn(e); }
+    a.canvas.remove();
+    delete hy.synth.a;
+  }
 
   function audioFailed(err) {
     console.warn(err);
@@ -469,13 +501,7 @@ function main(PH) {
         canvas: c, width: c.width, height: c.height, autoLoop: false, makeGlobal: false,
         detectAudio: false, enableStreamCapture: false,
       });
-      // hydra's Audio asks for the default mic with voice processing on; hand it our stream
-      const md = navigator.mediaDevices;
-      md.getUserMedia = () => Promise.resolve(stream.clone());
-      try { F._initAudio(); } finally { delete md.getUserMedia; }
-      F.detectAudio = true;
-      const s = F.synth, a = s.a;
-      a.setSmooth(t.smooth); a.setScale(t.scale); a.show();
+      const s = F.synth, a = attachAudio(F, stream, t.smooth, t.scale);
       a.canvas.classList.add('meter');
       const bass = () => Math.min(1.5, a.fft[0]), high = () => Math.min(1.5, a.fft[3]);
       t.fxv = {
@@ -495,17 +521,237 @@ function main(PH) {
 
   function fxOff(t) {
     if (!t.fx) return;
-    const a = t.fx.synth.a;
-    try {
-      if (a.stream) a.stream.getTracks().forEach(k => k.stop());
-      if (a.context) a.context.close();
-      a.canvas.remove();
-      const lose = t.fx.regl._gl.getExtension('WEBGL_lose_context');
-      if (lose) lose.loseContext();
-    } catch (e) { console.warn(e); }
+    detachAudio(t.fx);
+    const lose = t.fx.regl._gl.getExtension('WEBGL_lose_context');
+    if (lose) lose.loseContext();
     t.fxc.remove();
     t.fx = null; t.fxc = null; t.fxv = null;
   }
+
+  // ---- 03 Set: decks A and B on their own instances (sketches hardcode o0 and render), ----------
+  // a compositor instance pulls both in with s0/s1, crossfades with blend and runs the master FX
+
+  const XFADE = 3000;
+  const setEl = $('#set'), setOut = $('#set-out'), setCr = $('#set-cr'), setBlack = $('#set-black');
+  const setUi = $('#set-ui'), setHelp = $('#set-help'), setFps = $('#set-fps'), setFader = $('#set-fader');
+  const setDeck = [$('#set-a'), $('#set-b')];
+  const S = {
+    open: false, ready: false, decks: [], comp: null, fxv: null,
+    fader: 0, tween: null, cue: null, t: 0, auto: true, black: false, credits: true,
+    audio: false, react: 0.5, smooth: 0.6, scale: 16, kal: false,
+    items: D.hydras.map(() => ({ on: true, dur: 60, row: null })),
+  };
+
+  const setBtn = {};
+  for (const [k, label, fn] of [
+    ['next', 'Next', () => go(false)], ['cut', 'Cut', () => go(true)], ['auto', 'Auto', () => { S.auto = !S.auto; S.t = 0; syncSet(); }],
+    ['black', 'Blackout', () => setBlackout(!S.black)], ['credits', 'Credits', () => { S.credits = !S.credits; syncSet(); }],
+    ['audio', 'Audio', () => setAudioSet(!S.audio)],
+  ]) {
+    setBtn[k] = h('button', { class: k === 'black' ? 'btn btn-sig' : 'btn', type: 'button', text: label, onclick: fn });
+    $('#set-acts').append(setBtn[k]);
+  }
+  $('#set-fx').append(
+    slider('React', 0, 1, 0.01, S.react, v => { S.react = v; }),
+    slider('Smooth', 0, 0.95, 0.01, S.smooth, v => { S.smooth = v; if (S.comp && S.comp.synth.a) S.comp.synth.a.setSmooth(v); }),
+    slider('Scale', 2, 40, 1, S.scale, v => { S.scale = v; if (S.comp && S.comp.synth.a) S.comp.synth.a.setScale(v); }),
+    h('button', { class: 'btn', type: 'button', text: 'Kaleid', 'aria-pressed': 'false',
+      onclick: e => { S.kal = !S.kal; e.currentTarget.setAttribute('aria-pressed', String(S.kal)); } }));
+
+  S.items.forEach((it, n) => {
+    const s = D.hydras[n];
+    const on = h('input', { type: 'checkbox', checked: true, 'aria-label': 'Include ' + s.title });
+    on.addEventListener('change', () => { it.on = on.checked; });
+    const dur = h('input', { type: 'number', min: 1, max: 3600, step: 1, value: String(it.dur), 'aria-label': s.title + ' seconds' });
+    dur.addEventListener('change', () => { it.dur = Math.max(1, Number(dur.value) || 60); });
+    it.row = h('li', {}, on, h('kbd', { text: String(n + 1) }), h('span', { class: 'pl-t', text: s.title }), dur,
+      h('button', { class: 'btn', type: 'button', text: 'Cue', onclick: () => cueItem(n) }));
+    $('#set-pl').append(it.row);
+  });
+  // clicked controls give focus back so space and the arrows stay set keys
+  setUi.addEventListener('click', e => { if (e.target.closest('button,input[type=checkbox]')) e.target.blur(); });
+  setFader.addEventListener('input', () => { S.tween = null; S.fader = Number(setFader.value); syncSet(); });
+  $('#set-x').addEventListener('click', () => leaveViewer());
+  $('#set-help-b').addEventListener('click', () => { setHelp.hidden = !setHelp.hidden; });
+
+  const onAir = () => (S.fader < 0.5 ? 0 : 1);
+  const credit = n => D.hydras[n].title + ' · ' + D.hydras[n].artist + ' · CC BY-NC-SA 4.0';
+
+  function syncSet() {
+    setFader.value = String(S.fader);
+    const air = onAir();
+    S.decks.forEach((d, i) => {
+      setDeck[i].textContent = (i ? 'B · ' : 'A · ') + (d.item >= 0 ? D.hydras[d.item].title : '-');
+      setDeck[i].classList.toggle('on', i === air);
+    });
+    const live = S.decks[air] ? S.decks[air].item : -1;
+    setCr.textContent = live >= 0 ? credit(live) : '';
+    setCr.hidden = !S.credits;
+    S.items.forEach((it, n) => {
+      it.row.classList.toggle('on', n === live);
+      it.row.classList.toggle('cue', S.cue !== null && S.decks[S.cue].item === n);
+    });
+    for (const [k, v] of [['auto', S.auto], ['black', S.black], ['credits', S.credits], ['audio', S.audio]]) setBtn[k].setAttribute('aria-pressed', String(v));
+  }
+
+  function mkHydra(canvas) {
+    canvas.width = Q.cfg.w; canvas.height = Q.cfg.h;
+    return new window.Hydra({ canvas, width: Q.cfg.w, height: Q.cfg.h, autoLoop: false, makeGlobal: false, detectAudio: false, enableStreamCapture: false });
+  }
+
+  function setupSet() {
+    S.decks = [0, 1].map(() => ({ hydra: mkHydra(document.createElement('canvas')), item: -1 }));
+    const c = h('canvas', { class: 'set-c', 'aria-label': 'Set output' });
+    setOut.prepend(c);
+    S.comp = mkHydra(c);
+    const s = S.comp.synth;
+    s.s0.init({ src: S.decks[0].hydra.canvas });
+    s.s1.init({ src: S.decks[1].hydra.canvas });
+    const band = i => (S.audio && s.a ? Math.min(1.5, s.a.fft[i]) : 0);
+    S.fxv = {
+      zoom: () => 1 + band(0) * 0.25 * S.react,
+      flash: () => band(0) * band(0) * 0.3 * S.react,
+      kal: () => (S.kal ? Math.min(1, band(3) * S.react) : 0),
+    };
+    const mix = () => s.src(s.s0).blend(s.src(s.s1), () => S.fader);
+    mix().scale(S.fxv.zoom).blend(mix().kaleid(4).scale(S.fxv.zoom), S.fxv.kal).brightness(S.fxv.flash).out(s.o0);
+    S.ready = true;
+  }
+
+  // a sketch that throws leaves the deck on its last good frame
+  function loadDeck(d, n) {
+    const dk = S.decks[d], hy = dk.hydra;
+    dk.item = n;
+    hy.hush();
+    hy.synth.time = 0;
+    try { new Function('h', 'with(h){' + D.hydras[n].code + '\n}')(hy.synth); } catch (e) { console.warn('sketch error', e); }
+    hy.tick(16);
+    syncSet();
+  }
+
+  function nextIdx(from) {
+    for (let j = 1; j <= S.items.length; j++) {
+      const k = (from + j) % S.items.length;
+      if (S.items[k].on) return k;
+    }
+    return from;
+  }
+
+  // to the other deck: the cued sketch if there is one, else the next one in the playlist
+  function go(cut) {
+    if (!S.ready) return;
+    if (S.tween) { S.fader = S.tween.to; S.tween = null; }
+    const off = 1 - onAir();
+    if (S.cue !== off) loadDeck(off, nextIdx(S.decks[onAir()].item));
+    S.cue = null;
+    if (cut) S.fader = off; else S.tween = { from: S.fader, to: off, t0: performance.now() };
+    S.t = 0;
+    syncSet();
+  }
+
+  function cueItem(n) {
+    if (!S.ready || n < 0 || n >= S.items.length) return;
+    if (S.tween) { S.fader = S.tween.to; S.tween = null; }
+    const off = 1 - onAir();
+    loadDeck(off, n);
+    S.cue = off;
+    syncSet();
+  }
+
+  function nudge(dv) {
+    S.tween = null;
+    S.fader = Math.min(1, Math.max(0, Math.round((S.fader + dv) * 100) / 100));
+    syncSet();
+  }
+
+  // a plain overlay: works whatever state the decks are in
+  function setBlackout(on) {
+    S.black = on;
+    setBlack.hidden = !on;
+    setBtn.black.setAttribute('aria-pressed', String(on));
+  }
+
+  function setAudioSet(on) {
+    S.audio = on;
+    $('#set-audio').hidden = !on;
+    syncSet();
+    if (!S.comp) return;
+    if (!on) { detachAudio(S.comp); return; }
+    openInput(input.id).then(stream => {
+      if (!S.audio || S.comp.synth.a) return;
+      const a = attachAudio(S.comp, stream, S.smooth, S.scale);
+      // the meter belongs to the controller, not the output
+      a.canvas.removeAttribute('style');
+      a.canvas.className = 'set-meter';
+      $('#set-meter').append(a.canvas);
+    }).catch(err => { audioFailed(err); setAudioSet(false); });
+  }
+
+  function setTick(dt, now) {
+    if (S.tween) {
+      const k = Math.min(1, (now - S.tween.t0) / XFADE);
+      S.fader = S.tween.from + (S.tween.to - S.tween.from) * k;
+      if (k >= 1) S.tween = null;
+      syncSet();
+    } else if (S.auto) {
+      S.t += dt;
+      const cur = S.decks[onAir()].item;
+      if (cur >= 0 && S.t >= S.items[cur].dur * 1000) go(false);
+    }
+    // only a deck that is in the mix ticks and uploads its frame
+    const vis = [S.fader < 1, S.fader > 0];
+    vis.forEach((v, d) => { if (v) S.decks[d].hydra.tick(dt); });
+    S.comp.synth.s0.dynamic = vis[0];
+    S.comp.synth.s1.dynamic = vis[1];
+    S.comp.tick(dt);
+    setFps.textContent = 'fps ' + Math.round(Q.guard.fps) + ' · ' + Q.level;
+  }
+
+  function openSet(opener) {
+    if (S.open) return;
+    S.open = true;
+    setEl.hidden = false;
+    document.body.classList.add('fs-open');
+    if (setEl.requestFullscreen) setEl.requestFullscreen().catch(() => {});
+    enterViewer(setEl, opener, closeSet);
+    loadHydraLib().then(() => {
+      if (!S.ready) { setupSet(); loadDeck(0, nextIdx(-1)); }
+      S.t = 0;
+      syncSet();
+    }).catch(err => console.error(err));
+  }
+
+  function closeSet() {
+    S.open = false;
+    setEl.hidden = true;
+    setHelp.hidden = true;
+    document.body.classList.remove('fs-open');
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    if (S.audio) setAudioSet(false);
+  }
+
+  const navSet = $('#nav-set');
+  navSet.addEventListener('click', e => { e.preventDefault(); openSet(navSet); });
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && S.open) leaveViewer();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (!S.open || e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    // blackout first, before anything that could throw
+    if (k === 'b') { e.preventDefault(); setBlackout(!S.black); return; }
+    if (e.target.matches && e.target.matches('input[type=number]')) return;
+    if (k === ' ') go(e.shiftKey);
+    else if (k >= '1' && k <= '9') cueItem(Number(k) - 1);
+    else if (k === 'ArrowLeft') nudge(-0.05);
+    else if (k === 'ArrowRight') nudge(0.05);
+    else if (k === 'h') { setUi.hidden = !setUi.hidden; setHelp.hidden = true; }
+    else if (k === 'a') setAudioSet(!S.audio);
+    else if (k === '?') setHelp.hidden = !setHelp.hidden;
+    else return;
+    e.preventDefault();
+  });
 
   // ---- loop -----------------------------------------------------------------------------------
 
@@ -542,7 +788,11 @@ function main(PH) {
     acc += Math.min(100, now - last);
     last = now;
     // frame cap, with 1 ms of slack for rAF jitter
-    if (acc >= 1000 / Q.cfg.fps - 1) {
+    if (acc >= 1000 / Q.cfg.fps - 1 && S.open && S.ready) {
+      setTick(acc, now);
+      Q.guard.frame(now);
+      acc = 0;
+    } else if (acc >= 1000 / Q.cfg.fps - 1) {
       const live = liveTiles();
       for (const t of live) {
         t.hydra.tick(acc);
@@ -558,5 +808,5 @@ function main(PH) {
   Q.on(syncQuality);
   syncQuality();
 
-  window.__ph = { cards: cardEls.length, tiles, q: Q, makeGuard, liveTiles };
+  window.__ph = { cards: cardEls.length, tiles, q: Q, makeGuard, liveTiles, set: S };
 }

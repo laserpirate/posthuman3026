@@ -3,8 +3,8 @@
 One page for running posthuman3026 at the party. Same build and same URL on every machine.
 Chrome is the primary browser on Windows and macOS. Safari on the Mac is a backup: test it, don't depend on it.
 
-> Status: Phase 1 (audio on the demo site, quality levels). The `03 Set` controller, its keys, blackout and output
-> windows land in Phase 2 and 3; those sections are marked below.
+> Status: Phase 2 (minimal). `03 Set` (nav, top right) is a full screen controller: decks A/B, compositor, playlist,
+> timer auto-advance, crossfade, blackout, audio. Not yet: live-edit panel, tap tempo, MIDI, playlist save, output windows, relay.
 
 ## Machines
 
@@ -90,15 +90,26 @@ Prefer wired: Luna's Ethernet expansion card into the venue switch. The relay's 
 6. Hydras > Audio on one tile > pick the interface in **Audio input** > check the meters move with the DJ feed.
 7. Launch the kiosk window on the projector.
 
-## Keys (Phase 2)
+## Keys (03 Set; `?` shows the card)
 
-The `03 Set` controller keys (space, 1 to 7, arrows, T, B, H, A, Esc) and the `?` help card arrive in Phase 2.
-On the demo site today: **Esc** closes a full screen viewer.
+| Key | Does |
+|---|---|
+| space | Next (3 s crossfade to the other deck: the cued sketch, else the next checked one) |
+| shift+space | Cut |
+| 1 to 7 | Cue that sketch to the other deck |
+| ← / → | Fader |
+| B | Blackout |
+| H | Hide the controller (output only) |
+| A | Audio on / off (master FX on the mix; pick the input in the controller) |
+| Esc | Exit the set |
+
+Playlist: the 7 hydras in order, checkbox to include, seconds per item (default 60), **Auto** advances by timer.
+Credits (title · author · CC BY-NC-SA 4.0) show on the output by default; keep them on, the license requires it.
 
 ## Panic
 
-- Phase 2 adds **B** (blackout) on the set page, working even if a sketch throws.
-- Today: Esc out of full screen; reload the page (the password is remembered for the tab); if Chrome hangs, kill it and relaunch the kiosk line.
+- **B** blacks out the set output at once, whatever the decks are doing (a plain overlay). A sketch that throws keeps its deck's last frame.
+- Esc out of full screen; reload the page (the password is remembered for the tab); if Chrome hangs, kill it and relaunch the kiosk line.
 - **Fallback video:** record a 10 minute loop beforehand with OBS (Sources > Window Capture > the Chrome output window,
   Settings > Output > Recording: MP4, 1920x1080, 30 fps). If the browser dies, play it full screen in VLC
   (`vlc --fullscreen --loop loop.mp4`) or QuickTime (View > Loop, then full screen).

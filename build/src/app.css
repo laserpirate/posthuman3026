@@ -145,3 +145,42 @@ body.fs-open{overflow:hidden}
   .fs-bar{min-height:calc(max(12px,env(safe-area-inset-top)) + 56px);padding-top:max(12px,env(safe-area-inset-top));
     padding-left:calc(max(12px,env(safe-area-inset-left)) + 112px)}
 }
+
+/* 03 Set: output fills the screen; the controller is a left sidebar over it (H hides it) */
+.set{position:fixed;inset:0;z-index:110;background:#000}
+.set[hidden]{display:none}
+.set-out{position:absolute;inset:0}
+.set-c{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
+.set-cr{position:absolute;right:12px;bottom:10px;margin:0;z-index:2;font:400 11px var(--f-mono);color:rgba(228,230,225,.85);text-shadow:0 0 4px #000}
+.set-cr[hidden]{display:none}
+.set-black{position:absolute;inset:0;background:#000;z-index:5}
+.set-black[hidden]{display:none}
+.set-ui{position:absolute;left:0;top:0;bottom:0;z-index:6;width:min(380px,100%);overflow:auto;display:flex;flex-direction:column;gap:12px;
+  padding:12px;background:rgba(10,11,11,.9);border-right:1px solid var(--line)}
+.set-ui[hidden]{display:none}
+.set-ui .acts{padding-top:0;margin-top:0}
+.set-top{display:flex;align-items:center;gap:8px}
+.set-h{flex:1;font:600 15px var(--f-head);letter-spacing:.08em;text-transform:uppercase}
+.set-fps{font:400 11px var(--f-mono);color:var(--acc)}
+.set-decks{display:flex;flex-direction:column;gap:6px}
+.set-decks p{margin:0;font:500 12px var(--f-head);letter-spacing:.06em;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.set-decks p.on{color:var(--acc)}
+.set-decks input{width:100%;margin:0;accent-color:var(--acc)}
+.set-audio{display:flex;gap:10px;align-items:flex-start}
+.set-audio[hidden]{display:none}
+.set-audio .ab-s{display:flex}
+.set-meter{display:block;width:100px;height:80px;border:1px solid var(--line)}
+.set-pl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.set-pl li{display:flex;align-items:center;gap:6px;padding:4px 6px;border:1px solid var(--line);font-size:13px}
+.set-pl li.on{border-color:var(--acc)}
+.set-pl li.cue{border-color:var(--sig)}
+.set-pl input[type=checkbox]{accent-color:var(--acc);margin:0}
+.set-pl input[type=number]{width:58px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:0;padding:4px;font:12px var(--f-mono)}
+.set-pl .btn{padding:4px 8px}
+.pl-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.set-help{position:absolute;right:16px;top:16px;z-index:7;max-width:340px;padding:16px 20px;background:var(--bg);border:1px solid var(--line)}
+.set-help[hidden]{display:none}
+.set-help dl{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;margin:0;font-size:13px}
+.set-help dd{margin:0;color:var(--dim)}
+/* the set is a laptop tool: no nav link on phones */
+@media (max-width:600px){#nav-set{display:none}}

@@ -12,7 +12,10 @@ Live: https://laserpirate.github.io/posthuman3026/
   Quality levels (low / med / high) pick render size, fps cap and how many tiles run; the starting level comes from
   the GPU renderer string and drops one level after 5 s under 24 fps.
 
-Show night setup (machines, displays, audio, kiosk, offline): see `SHOWNIGHT.md`.
+- **03 Set**: full screen VJ controller inside the gate. Decks A/B on their own hydra instances, a compositor
+  instance mixes them (s0/s1 + blend) and runs the audio master FX; playlist with timer auto-advance, crossfade, cut, cue, blackout, credits overlay.
+
+Show night setup (machines, displays, audio, kiosk, offline, keys): see `SHOWNIGHT.md`.
 
 &copy; 2026 Marko Manriquez. All rights reserved. See `LICENSE`.
 

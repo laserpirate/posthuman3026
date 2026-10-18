@@ -101,7 +101,7 @@ for (const [w, hgt] of SIZES) {
 
   // top bar on one line, no overlap
   const top = await page.evaluate(() => {
-    const items = [document.querySelector('.brand'), ...document.querySelectorAll('.sections a')].map(e => e.getBoundingClientRect());
+    const items = [document.querySelector('.brand'), ...document.querySelectorAll('.sections a')].map(e => e.getBoundingClientRect()).filter(r => r.width > 0);
     const oneLine = items.every(r => Math.abs(r.top + r.height / 2 - (items[0].top + items[0].height / 2)) < 4);
     const overlap = items.some((r, i) => i && r.left < items[i - 1].right);
     return { oneLine, overlap, labels: [...document.querySelectorAll('.sections a')].map(a => a.innerText.replace(/\s+/g, ' ')) };

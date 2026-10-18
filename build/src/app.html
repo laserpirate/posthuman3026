@@ -4,6 +4,7 @@
     <nav class="sections" aria-label="Sections">
       <a href="#kodamas"><span>01</span> <b class="lg">Phylla </b>Kodamas</a>
       <a href="#hydras"><span>02</span> Hydras</a>
+      <a href="#set" id="nav-set"><span>03</span> Set</a>
     </nav>
   </div>
 </header>
@@ -68,4 +69,42 @@
   </div>
   <div class="fs-body" id="fs-body"></div>
   <button type="button" class="fx" id="fx" aria-label="Close" hidden><span aria-hidden="true">&larr;</span> Back</button>
+</div>
+
+<div class="set" id="set" hidden role="dialog" aria-modal="true" aria-label="Set">
+  <div class="set-out" id="set-out">
+    <p class="set-cr" id="set-cr"></p>
+    <div class="set-black" id="set-black" hidden></div>
+  </div>
+  <aside class="set-ui" id="set-ui">
+    <div class="set-top">
+      <span class="set-h">03 Set</span>
+      <span class="set-fps" id="set-fps"></span>
+      <button type="button" class="btn" id="set-help-b" aria-label="Keys">?</button>
+      <button type="button" class="btn btn-sig" id="set-x">Exit <kbd>Esc</kbd></button>
+    </div>
+    <div class="set-decks">
+      <p id="set-a"></p>
+      <input type="range" id="set-fader" min="0" max="1" step="0.01" value="0" aria-label="Crossfader">
+      <p id="set-b"></p>
+    </div>
+    <div class="acts" id="set-acts"></div>
+    <label class="fld">Quality <select id="set-q"></select></label>
+    <label class="fld" hidden>Audio input <select id="set-in"></select></label>
+    <div class="set-audio" id="set-audio" hidden><div id="set-meter"></div><div class="ab-s" id="set-fx"></div></div>
+    <ol class="set-pl" id="set-pl"></ol>
+  </aside>
+  <div class="set-help" id="set-help" hidden>
+    <dl>
+      <dt><kbd>space</kbd></dt><dd>Next (crossfade 3 s)</dd>
+      <dt><kbd>shift</kbd> <kbd>space</kbd></dt><dd>Cut</dd>
+      <dt><kbd>1</kbd> to <kbd>7</kbd></dt><dd>Cue to the other deck</dd>
+      <dt><kbd>&larr;</kbd> <kbd>&rarr;</kbd></dt><dd>Fader</dd>
+      <dt><kbd>B</kbd></dt><dd>Blackout</dd>
+      <dt><kbd>H</kbd></dt><dd>Hide controls</dd>
+      <dt><kbd>A</kbd></dt><dd>Audio on / off</dd>
+      <dt><kbd>?</kbd></dt><dd>This card</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Exit</dd>
+    </dl>
+  </div>
 </div>
