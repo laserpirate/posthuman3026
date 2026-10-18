@@ -7,6 +7,12 @@ Live: https://laserpirate.github.io/posthuman3026/
 - **01 Phylla Kodamas**: 12 kodama scenes (three.js r128, allowlisted by kID in `build/build.mjs`) in two groups
   with still plates, search, group chips, one live preview at a time and full screen. All Phylla Kodamas are original works by Marko Manriquez; no reproduction.
 - **02 Hydras**: six live sketches from the Hydra gallery by their credited artists (CC BY-NC-SA 4.0), run with hydra-synth by Olivia Jack (AGPL-3.0).
+  Per tile: audio toggle (mic or line-in, input picker, hydra's band meters) driving a master FX applied after the
+  sketch on a second hydra canvas (zoom pump, bass flash, optional kaleid; React / Smooth / Scale sliders). Sketches stay verbatim.
+  Quality levels (low / med / high) pick render size, fps cap and how many tiles run; the starting level comes from
+  the GPU renderer string and drops one level after 5 s under 24 fps.
+
+Show night setup (machines, displays, audio, kiosk, offline): see `SHOWNIGHT.md`.
 
 &copy; 2026 Marko Manriquez. All rights reserved. See `LICENSE`.
 
@@ -14,7 +20,7 @@ Live: https://laserpirate.github.io/posthuman3026/
 
 ```
 docs/    deployable site (GitHub Pages: main /docs). Ciphertext except the gate, fonts and vendor files.
-build/   build.mjs, capture.mjs, e2e.mjs, leakcheck.mjs, src/ (gate + app templates), data/ (Hydra sketches)
+build/   build.mjs, capture.mjs, e2e.mjs, phone.mjs, leakcheck.mjs, serve.mjs, bench.mjs, src/ (gate + app templates), data/ (Hydra sketches)
 ```
 
 Kodama text and scenes are not stored in this repo. The build reads them from the kodama library folder
@@ -34,7 +40,11 @@ PH_PASSWORD=... node build.mjs pack --lib ../../All_Kodamas   # encrypt -> ../do
 PH_PASSWORD=... node leakcheck.mjs          # no kodama text, Hydra code or password in plaintext in docs/
 PH_PASSWORD=... node e2e.mjs                # headless end to end (--base URL to test live)
 PH_PASSWORD=... node phone.mjs              # phone widths 360/390/430 + 390 landscape (--base URL)
+node serve.mjs                              # offline: docs/ at http://localhost:8080/
+node bench.mjs                              # .cache/hydra-bench.html, a standalone GPU benchmark for the show laptops (plaintext sketches: keep out of docs/)
 ```
+
+`e2e.mjs` feeds Chromium a generated bass loop as a fake line-in (`--use-fake-device-for-media-stream`) to test the audio path.
 
 `--lib` defaults to `../../All_Kodamas` relative to `build/`.
 
